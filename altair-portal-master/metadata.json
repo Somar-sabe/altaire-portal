@@ -1,0 +1,8 @@
+{
+  "name": "Altair",
+  "description": "Altair CRM — secure, AI-powered customer relationship management platform with role-based access, audit logging, and integrated Gemini assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

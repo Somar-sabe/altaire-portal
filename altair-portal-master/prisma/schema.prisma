@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model LrmLead {
+  id                  String     @id @default(uuid())
+  name                String
+  company             String
+  targetProject       String
+  value               Float
+  stage               LeadStage
+  /// @pii
+  email               String
+  /// @pii
+  phone               String
+  /// @pii
+  altPhone            String?
+  /// @pii
+  workPhone           String?
+  /// @pii
+  workEmail           String?
+  /// @pii
+  whatsapp            String?
+  /// @pii
+  telegram            String?
+  /// @pii
+  instagram           String?
+  /// @pii
+  facebook            String?
+  source              String?
+  status              LeadStatus
+  tags                String[]
+  /// Valid range: 0-100 (enforced at validation layer)
+  aiScore             Int        @db.SmallInt
+  notes               String     @default("")
+  avatarColor         String     @default("#000000")
+  lang                String     @default("ar")
+  country             String     @default("Worldwide")
+  dateCreated         DateTime?
+  assignedAgentId     String?
+  adminInChargeId     String?
+  assignedById        String?
+  details             String     @default("[]")
+  deleted             Boolean    @default(false)
+  deletionReason      String?
+  deletionActorId     String?
+  deletionDate        DateTime?
+  lastInteractionDate DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  lastActivityAt      DateTime?
+  lastActivitySummary String?
+  // GPT-Codex (G) BEGIN: Wave 3 user relations for lead assignment and audit actor integrity.
+  assignedAgent        User?      @relation("LeadAssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  adminInCharge        User?      @relation("LeadAdminInCharge", fields: [adminInChargeId], references: [id], onDelete: SetNull)
+  assignedBy           User?      @relation("LeadAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  deletionActor        User?      @relation("LeadDeletionActor", fields: [deletionActorId], references: [id], onDelete: SetNull)
+  comments             LeadComment[]
+  activities           LeadActivity[]
+  // GPT-Codex (G) END: lead scalar references are now represented as Prisma relations.
+
+  @@index([deleted, assignedAgentId])
+  @@index([deleted, stage])
+  @@index([stage])
+  @@index([createdAt])
+}
+
+model LeadComment {
+  id           String    @id @default(uuid())
+  leadId       String
+  authorId     String
+  authorName   String
+  authorRole   Role
+  content      String
+  isReminder   Boolean   @default(false)
+  reminderDate DateTime?
+  createdAt    DateTime  @default(now())
+  // GPT-Codex (G) BEGIN: Wave 3 lead comment foreign-key relations.
+  lead         LrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author       User      @relation("LeadCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  // GPT-Codex (G) END: lead comments must point to an existing lead and author.
+
+  @@index([leadId])
+}
+
+model LeadActivity {
+  id         String         @id @default(uuid())
+  leadId     String
+  actorId    String
+  actorName  String
+  actionType LeadActionType
+  details    String
+  createdAt  DateTime       @default(now())
+  // GPT-Codex (G) BEGIN: Wave 3 lead activity foreign-key relations.
+  lead       LrmLead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor      User           @relation("LeadActivityActor", fields: [actorId], references: [id], onDelete: Restrict)
+  // GPT-Codex (G) END: lead activity rows must point to an existing lead and actor.
+
+  @@index([leadId, createdAt])
+}
+
+model User {
+  id                  String       @id @default(uuid())
+  firstName           String
+  lastName            String
+  /// @pii
+  mobileNumber        String
+  /// @pii
+  email               String       @unique
+  department          String
+  role                Role
+  photoUrl            String?
+  status              UserStatus
+  lastActive          DateTime?
+  jobTitle            String?
+  /// @pii
+  linkedInUrl         String?
+  location            String?
+  timezone            String?
+  bio                 String?
+  joinedDate          DateTime?
+  /// @pii
+  lastLoginIp         String?
+  failedLoginAttempts Int          @default(0)
+  twoFactorEnabled    Boolean      @default(false)
+  passwordHash        String
+  tokenVersion        Int          @default(0)
+  emailVerified       DateTime?
+  lastLoginAt         DateTime?
+  permissions         Permission[]
+  managerId           String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime   @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  // GPT-Codex (G) BEGIN: Wave 3 back-relations for FK-enforced domain rows.
+  assignedLeads        LrmLead[]    @relation("LeadAssignedAgent")
+  adminLeads           LrmLead[]    @relation("LeadAdminInCharge")
+  assignedLeadEvents   LrmLead[]    @relation("LeadAssignedBy")
+  deletedLeads         LrmLead[]    @relation("LeadDeletionActor")
+  leadComments         LeadComment[] @relation("LeadCommentAuthor")
+  leadActivities       LeadActivity[] @relation("LeadActivityActor")
+  spaceMemberships     SpaceMember[]
+  sentSpaceInvitations SpaceInvitation[] @relation("SpaceInvitationInviter")
+  receivedInvitations  SpaceInvitation[] @relation("SpaceInvitationRecipient")
+  sentMessages         Message[]     @relation("MessageSender")
+  receivedMessages     Message[]     @relation("MessageReceiver")
+  messageReactions     MessageReaction[]
+  feedPosts            FeedPost[]    @relation("FeedPostAuthor")
+  feedComments         FeedComment[] @relation("FeedCommentAuthor")
+  feedReactions        FeedReaction[] @relation("FeedReactionUser")
+  feedPollVotes        FeedPollVote[] @relation("FeedPollVoteUser")
+  // GPT-Codex (G) END: user references now have explicit relation ownership.
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actorRole  String
+  action     String
+  entityType String
+  entityId   String
+  summary    String
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model WorkspaceSpace {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  privacy     SpacePrivacy @default(PUBLIC)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  // GPT-Codex (G) BEGIN: Wave 3 workspace child relations.
+  members     SpaceMember[]
+  invitations SpaceInvitation[]
+  messages    Message[]
+  // GPT-Codex (G) END: workspace children are now FK-enforced.
+}
+
+model SpaceMember {
+  id       String    @id @default(uuid())
+  spaceId  String
+  userId   String
+  role     SpaceRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+  // GPT-Codex (G) BEGIN: Wave 3 workspace membership relations and uniqueness.
+  space   WorkspaceSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) END: memberships require valid space/user pairs.
+
+  @@index([spaceId, userId])
+  @@unique([spaceId, userId])
+}
+
+model SpaceInvitation {
+  id            String           @id @default(uuid())
+  spaceId       String
+  spaceName     String
+  invitedById   String
+  invitedByName String
+  userId        String
+  status        InvitationStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  // GPT-Codex (G) BEGIN: Wave 3 space invitation foreign-key relations.
+  space        WorkspaceSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  invitedBy    User             @relation("SpaceInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  user         User             @relation("SpaceInvitationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) END: invitations require valid space, inviter, and invited user.
+
+  @@index([userId, status])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  spaceId    String?
+  senderId   String
+  receiverId String?
+  content    String
+  isRichText Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  // GPT-Codex (G) BEGIN: Wave 3 message foreign-key relations.
+  space      WorkspaceSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  sender     User            @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver   User?           @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: SetNull)
+  reactions  MessageReaction[]
+  // GPT-Codex (G) END: messages now require valid senders and valid optional targets.
+
+  @@index([spaceId, createdAt])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  // GPT-Codex (G) BEGIN: Wave 3 message reaction relations and uniqueness.
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) END: message reactions require valid message/user pairs.
+
+  @@unique([messageId, userId, emoji])
+}
+
+model FeedPost {
+  id          String           @id @default(uuid())
+  authorId    String
+  authorName  String
+  type        FeedPostType
+  title       String?
+  content     String
+  eventDate   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  pollOptions FeedPollOption[]
+  pollVotes   FeedPollVote[]
+  comments    FeedComment[]
+  reactions   FeedReaction[]
+  // GPT-Codex (G) BEGIN: Wave 3 feed author relation.
+  author      User             @relation("FeedPostAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  // GPT-Codex (G) END: feed posts require valid authors.
+}
+
+model FeedComment {
+  id         String   @id @default(uuid())
+  postId     String
+  authorId   String
+  authorName String
+  content    String
+  createdAt  DateTime @default(now())
+  post       FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) BEGIN: Wave 3 feed comment author relation.
+  author     User     @relation("FeedCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  // GPT-Codex (G) END: feed comments require valid authors.
+
+  @@index([postId, createdAt])
+}
+
+model FeedReaction {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) BEGIN: Wave 3 feed reaction user relation and uniqueness.
+  user      User     @relation("FeedReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) END: feed reactions require valid users and one matching emoji per user/post.
+
+  @@unique([postId, userId, emoji])
+}
+
+model FeedPollOption {
+  id        String         @id @default(uuid())
+  postId    String
+  text      String
+  votes     Int            @default(0)
+  post      FeedPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  votesList FeedPollVote[]
+}
+
+model FeedPollVote {
+  id        String         @id @default(uuid())
+  postId    String
+  optionId  String
+  userId    String
+  createdAt DateTime       @default(now())
+  option    FeedPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  post      FeedPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) BEGIN: Wave 3 feed poll vote user relation.
+  user      User           @relation("FeedPollVoteUser", fields: [userId], references: [id], onDelete: Cascade)
+  // GPT-Codex (G) END: poll votes require valid users.
+
+  @@unique([postId, userId])
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  AGENT
+}
+
+enum Permission {
+  view_leads
+  create_lead
+  edit_lead
+  delete_lead
+  assign_lead
+  export_leads
+  view_feed
+  publish_to_feed
+  edit_feed_posts
+  delete_feed_posts
+  react_to_feed
+  comment_on_feed
+  delete_feed_comments
+  view_workspace
+  create_space
+  view_team
+  invite_users
+  manage_roles
+  edit_users
+  delete_users
+  send_messages
+  view_all_messages
+  manage_campaigns
+  view_campaigns
+  view_reports
+  export_reports
+  view_overview
+  manage_company_settings
+  manage_billing
+}
+
+enum LeadStage {
+  NEW
+  IN_PROGRESS
+  INTERESTED
+  NOT_INTERESTED
+  CONTACTED
+  FEEDBACK_REQ
+  BOOKED
+  CONVERTED
+  LOST
+}
+
+enum SpaceRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum SpacePrivacy {
+  PUBLIC
+  PRIVATE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum FeedPostType {
+  ANNOUNCEMENT
+  UPDATE
+  EVENT
+  POLL
+  DISCUSSION
+  STAR
+}
+
+enum LeadActionType {
+  CREATED
+  UPDATED
+  STAGE_CHANGED
+  ASSIGNED
+  COMMENTED
+  DELETED
+  RESTORED
+  EXPORTED
+  IMPORTED
+}
+
+enum LeadStatus {
+  ACTIVE
+  INACTIVE
+  TRASH
+}

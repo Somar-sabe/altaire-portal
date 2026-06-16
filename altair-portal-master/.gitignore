@@ -1,0 +1,16 @@
+node_modules/
+.next/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+*.db
+prisma/dev.db
+
+# Build cruft
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/
