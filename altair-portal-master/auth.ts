@@ -16,12 +16,7 @@ declare module "next-auth" {
 
 // Augment @auth/core/types directly to avoid the TS2310 recursive-reference
 // bug that occurs when augmenting next-auth's re-exported User in v5 beta.
-declare module "@auth/core/types" {
-  interface User {
-    role: string;
-    tokenVersion: number;
-  }
-}
+
 
 // GPT-Codex (G) BEGIN: keep Auth.js on the shared Prisma singleton and avoid credential/session enumeration.
 export const { handlers, auth: originalAuth, signIn, signOut } = NextAuth({
