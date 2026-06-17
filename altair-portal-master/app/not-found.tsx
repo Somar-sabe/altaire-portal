@@ -25,7 +25,7 @@ export default function NotFound() {
           href="/"
           className="inline-block bg-slate-900 text-white px-8 py-3 rounded-full font-bold transition-transform hover:scale-105 active:scale-95"
         >
-          Return Home
+          Return Home please
         </Link>
       </div>
     </div>
