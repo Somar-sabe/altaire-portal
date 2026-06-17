@@ -1,39 +1,73 @@
-import NextAuth, { type DefaultSession } from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import { UserStatus, Role } from '@prisma/client';
-import argon2 from 'argon2';
-import { prisma } from '@/lib/prisma';
+import NextAuth, { type DefaultSession } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { UserStatus } from "@prisma/client";
+import argon2 from "argon2";
+import { prisma } from "@/lib/prisma";
+
+/**
+ * =========================
+ * TYPES
+ * =========================
+ */
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    id: string;
+    role: string;
+    tokenVersion: number;
+  }
+}
 
 declare module "next-auth" {
   interface Session {
     user: {
-      role: string;
       id: string;
-    } & DefaultSession["user"]
+      role: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    id: string;
+    role: string;
+    tokenVersion: number;
+  }
+
+  // Move JWT augmentation inside the main next-auth module
+  interface JWT {
+    id?: string;
+    role?: string;
+    tokenVersion?: number;
   }
 }
 
-// Augment @auth/core/types directly to avoid the TS2310 recursive-reference
-// bug that occurs when augmenting next-auth's re-exported User in v5 beta.
 
-
-// GPT-Codex (G) BEGIN: keep Auth.js on the shared Prisma singleton and avoid credential/session enumeration.
+/**
+ * =========================
+ * NEXTAUTH
+ * =========================
+ */
 export const { handlers, auth: originalAuth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
+  session: { strategy: "jwt" },
+
   providers: [
     Credentials({
-      name: 'Credentials',
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        const invalidCredentials = new Error('Invalid credentials');
 
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw invalidCredentials;
+          throw new Error("Invalid credentials");
         }
 
         const user = await prisma.user.findUnique({
@@ -41,7 +75,7 @@ export const { handlers, auth: originalAuth, signIn, signOut } = NextAuth({
         });
 
         if (!user || !user.passwordHash) {
-          throw invalidCredentials;
+          throw new Error("Invalid credentials");
         }
 
         const isValid = await argon2.verify(
@@ -49,12 +83,13 @@ export const { handlers, auth: originalAuth, signIn, signOut } = NextAuth({
           credentials.password as string
         );
 
-        if (!isValid) {
-          throw invalidCredentials;
-        }
+        if (!isValid) throw new Error("Invalid credentials");
 
-        if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.INACTIVE) {
-          throw invalidCredentials;
+        if (
+          user.status === UserStatus.SUSPENDED ||
+          user.status === UserStatus.INACTIVE
+        ) {
+          throw new Error("Invalid credentials");
         }
 
         return {
@@ -67,38 +102,31 @@ export const { handlers, auth: originalAuth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
         token.id = user.id;
+        token.role = user.role;
         token.tokenVersion = user.tokenVersion;
-      } else if (token.id) {
-        // verify tokenVersion is still valid
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { tokenVersion: true },
-        });
-        if (!dbUser || dbUser.tokenVersion !== token.tokenVersion) {
-          return null;
-        }
       }
+
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string;
         session.user.id = token.id as string;
+        session.user.role = token.role as string;
       }
+
       return session;
     },
   },
+
   pages: {
-    signIn: '/',
+    signIn: "/",
   },
 });
 
-// NOTE: No dev auth bypass. Use real credentials in all environments to avoid
-// accidentally shipping a backdoor to production.
 export { originalAuth as auth };
-// GPT-Codex (G) END: auth failures are generic and revoked JWTs terminate without throwing.
