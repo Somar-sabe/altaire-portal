@@ -1,11 +1,4 @@
-/**
- * @file app/api/auth/[...nextauth]/route.ts
- * @purpose Auth.js v5 handler — wraps POST (login) with auth-path rate limiting.
- * @dependencies @/auth, @/lib/ratelimit, @/lib/errors, @/lib/client-ip, next/server
- *
- * GET is safe (CSRF / session fetches) — no rate limiting needed.
- * POST (credential login) is throttled per trusted client IP.
- */
+export const dynamic = 'force-dynamic'; // <-- CRITICAL NEXT.JS 15 BUILD FIX
 
 import { handlers } from '@/auth';
 import { NextRequest, NextResponse } from 'next/server';
