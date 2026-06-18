@@ -71,7 +71,8 @@ export async function requirePermission(permission: Permission): Promise<void> {
 
 /**
  * Returns true if the current session user holds `permission`; false otherwise.
- * Never throws — use when you need a boolean check without early-exit.
+ * Never throws — ub 
+ * se when you need a boolean check without early-exit.
  */
 export async function hasPermission(permission: Permission): Promise<boolean> {
   try {
