@@ -1,19 +1,31 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  
+  // Fixes the workspace lockfile warning
+  outputFileTracingRoot: __dirname,
+
   typescript: {
     ignoreBuildErrors: false,
   },
-  // GPT-Codex (G) BEGIN: add production security headers and remove placeholder remote-image allowance.
+
   async headers() {
     const csp = [
       "default-src 'self'",
+      // added next-auth inline script support if needed
       "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      // allowed secure external avatars and assets
+      "img-src 'self' data: blob: https://googleusercontent.com https://githubusercontent.com",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      // CRITICAL FIX: allowed NextAuth endpoints and Gemini AI routes to connect
+      "connect-src 'self' https://*.next-auth.org https://googleapis.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -28,18 +40,13 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
     ];
   },
-  // GPT-Codex (G) END: build linting is no longer bypassed and headers are emitted for every route.
-  webpack: (config, {dev}) => {
-    // HMR is disabled in AI Studio via DISABLE_HMR env var.
-    // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+
+  webpack: (config, { dev }) => {
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = {
         ignored: /.*/,
